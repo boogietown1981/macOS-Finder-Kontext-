@@ -13,9 +13,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.1.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>LSUIElement</key>
@@ -39,11 +39,19 @@
 				<key>NSApplicationIdentifier</key>
 				<string>com.apple.finder</string>
 			</dict>
+			<key>NSReturnTypes</key>
+			<array/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.item</string>
+			</array>
 			<key>NSSendTypes</key>
 			<array>
 				<string>NSFilenamesPboardType</string>
 				<string>public.file-url</string>
 			</array>
+			<key>NSServiceDescription</key>
+			<string>FinderExtras – Ausschneiden (vormerken)</string>
 			<key>NSUserData</key>
 			<string>cut</string>
 		</dict>
@@ -62,11 +70,19 @@
 				<key>NSApplicationIdentifier</key>
 				<string>com.apple.finder</string>
 			</dict>
+			<key>NSReturnTypes</key>
+			<array/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.folder</string>
+			</array>
 			<key>NSSendTypes</key>
 			<array>
 				<string>NSFilenamesPboardType</string>
 				<string>public.file-url</string>
 			</array>
+			<key>NSServiceDescription</key>
+			<string>FinderExtras – In diesen Ordner verschieben</string>
 			<key>NSUserData</key>
 			<string>move</string>
 		</dict>
@@ -85,11 +101,19 @@
 				<key>NSApplicationIdentifier</key>
 				<string>com.apple.finder</string>
 			</dict>
+			<key>NSReturnTypes</key>
+			<array/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.item</string>
+			</array>
 			<key>NSSendTypes</key>
 			<array>
 				<string>NSFilenamesPboardType</string>
 				<string>public.file-url</string>
 			</array>
+			<key>NSServiceDescription</key>
+			<string>FinderExtras – Pfade kopieren</string>
 			<key>NSUserData</key>
 			<string>paths</string>
 		</dict>

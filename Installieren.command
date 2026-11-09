@@ -11,9 +11,13 @@ if ! xcrun --find swiftc >/dev/null 2>&1; then
     echo "Danach diesen Installer erneut starten."; exit 1
 fi
 APP="$HOME/Applications/FinderExtras.app"
-if [[ -e "$APP" ]]; then
-    echo "FinderExtras existiert bereits. Bitte App beenden und vor dem Neubau umbenennen oder entfernen."
+if pgrep -x FinderExtras >/dev/null; then
+    echo "Bitte FinderExtras über das Menüleistensymbol beenden und diesen Installer erneut starten."
     exit 1
+fi
+if [[ -e "$APP" ]]; then
+    EXISTING_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")
+    [[ "$EXISTING_ID" == "de.itso.FinderExtras" ]] || { echo "Unerwartete App am Ziel; Abbruch."; exit 1; }
 fi
 BUILD="$(mktemp -d "${TMPDIR:-/tmp}/finderextras.XXXXXX")"
 trap 'rm -rf "$BUILD"' EXIT
@@ -27,8 +31,26 @@ xcrun swiftc -swift-version 5 -O -target "$(uname -m)-apple-macosx12.0" \
 codesign --force --sign - "$BUNDLE"
 codesign --verify --strict "$BUNDLE"
 mkdir -p "$HOME/Applications"
-mv "$BUNDLE" "$APP"
+if [[ -e "$APP" ]]; then
+    BACKUP="$HOME/Library/Application Support/FinderExtras/Backups/$(date +%Y%m%d-%H%M%S)-$$.zip"
+    mkdir -p "$(dirname "$BACKUP")"
+    /usr/bin/ditto -c -k --keepParent "$APP" "$BACKUP"
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$APP" || true
+    OLD="$BUILD/Previous-FinderExtras.app"
+    mv "$APP" "$OLD"
+    if ! mv "$BUNDLE" "$APP"; then
+        mv "$OLD" "$APP"
+        exit 1
+    fi
+    echo "Sicherung der alten Version: $BACKUP"
+else
+    mv "$BUNDLE" "$APP"
+fi
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
+# Ask the user-session Services agent to refresh; never reset global preferences.
+if [[ -x /System/Library/CoreServices/pbs ]]; then
+    /System/Library/CoreServices/pbs -update || echo "Dienste bitte nach Ab-/Anmelden erneut prüfen."
+fi
 open "$APP"
 echo "Installiert: $APP"
 echo "Die Einrichtung steht unter FinderExtras → Hilfe und Einrichtung."

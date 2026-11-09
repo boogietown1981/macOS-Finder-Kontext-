@@ -6,7 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var status: NSStatusItem!
     var busy = false
     let help = """
-    FinderExtras 0.1.0 — lokale Testversion
+    FinderExtras 0.1.1 — lokale Testversion
 
     1. Dateien im Finder auswählen → Ausschneiden (vormerken).
     2. Zielordner öffnen → Hierher verschieben.
@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(menu, "Mit NAS / Server verbinden …", "server")
         add(menu, "Übergeordneten Ordner öffnen", "parent")
         menu.addItem(.separator())
+        add(menu, "Dienste neu registrieren", "register")
         add(menu, "Hilfe und Einrichtung …", "help")
         add(menu, "Beenden", "quit")
         status.menu = menu
@@ -122,6 +123,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     func perform(_ action: String) throws {
         switch action {
+        case "register":
+            NSUpdateDynamicServices()
+            message("Dienste wurden zur erneuten Registrierung gemeldet. Bitte im Finder eine Datei auswählen und unter Finder → Dienste prüfen. Falls weiterhin nichts erscheint, einmal ab- und wieder anmelden.")
         case "help": message(help)
         case "quit": NSApp.terminate(nil)
         case "paths":

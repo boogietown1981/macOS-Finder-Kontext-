@@ -1,4 +1,4 @@
-# FinderExtras 0.1.0
+# FinderExtras 0.1.1
 
 Kleine native Swift/AppKit-App für macOS ab 12, Intel und Apple Silicon.
 Lokale Testversion: Quellcode erstellt und statisch geprüft, noch nicht auf
@@ -13,7 +13,8 @@ macOS kompiliert oder im Finder ausgeführt. Kein fertiges signiertes Binary.
    Installation abschließen und Schritt 2 wiederholen. Vollständiges Xcode
    ist nicht nötig. Der Installer lädt keine fremden Abhängigkeiten herunter.
 4. App wird lokal gebaut, ad-hoc signiert und nach `~/Applications` installiert.
-   Ein bestehendes FinderExtras wird nicht überschrieben.
+   Die eigene vorherige Version wird nach erfolgreichem Build gesichert und ersetzt.
+   Vor dem Update FinderExtras über das Menüleistensymbol beenden.
 5. Unter Datenschutz & Sicherheit → Bedienungshilfen die installierte App
    hinzufügen und erlauben. Bei der ersten Aktion Automation für Finder und
    System Events erlauben. Kein Vollzugriff auf die Festplatte erforderlich.
@@ -90,3 +91,19 @@ Quellen:
 - https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/SysServices/Articles/properties.html
 - https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Finder.html
 - https://support.apple.com/de-ch/102650
+
+## Änderung 0.1.1: Fehlende Dienste
+
+Die Dienste deklarieren nun zusätzlich `NSSendFileTypes` mit `public.item`
+(bzw. `public.folder` für das Verschiebeziel). Zuvor waren nur Zwischenablage-
+typen angegeben. Dies verbessert die Zuordnung zu ausgewählten Finder-Dateien;
+die konkrete Ursache auf dem betroffenen Mac ist noch nicht bestätigt.
+Der Installer registriert das Bundle erneut und fordert eine Aktualisierung
+beim Dienste-Agent an. Ein Menüpunkt erlaubt außerdem NSUpdateDynamicServices.
+
+Update: FinderExtras beenden, neuen Installer ausführen. Die alte App wird als
+ZIP unter ~/Library/Application Support/FinderExtras/Backups gesichert. Wegen
+der lokalen Ad-hoc-Signierung können Bedienungshilfen erneut erlaubt werden
+müssen. Falls Einträge fehlen, einmal ab-/anmelden und Finder → Dienste sowie
+die Dienste-Einstellungen prüfen. Kein Neustart oder globaler Cache-Reset wird
+erzwungen. Der macOS-Funktionstest dieser Korrektur steht weiterhin aus.
