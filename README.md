@@ -1,4 +1,4 @@
-# FinderExtras 0.1.1
+# FinderExtras 0.1.2
 
 Kleine native Swift/AppKit-App für macOS ab 12, Intel und Apple Silicon.
 Lokale Testversion: Quellcode erstellt und statisch geprüft, noch nicht auf
@@ -107,3 +107,25 @@ der lokalen Ad-hoc-Signierung können Bedienungshilfen erneut erlaubt werden
 müssen. Falls Einträge fehlen, einmal ab-/anmelden und Finder → Dienste sowie
 die Dienste-Einstellungen prüfen. Kein Neustart oder globaler Cache-Reset wird
 erzwungen. Der macOS-Funktionstest dieser Korrektur steht weiterhin aus.
+
+## Änderung 0.1.2: Textclip statt Datei
+
+Die vier Dateiaktionen senden keine simulierten Cmd-C/Cmd-V-Tasten mehr.
+Ausschneiden/Kopieren übernehmen die Finder-Auswahl bzw. die vom Dienst
+übergebenen Datei-URLs direkt in die Zwischenablage. Verschieben/Einfügen
+akzeptieren ausschließlich Datei-URLs und rufen Finder move/duplicate direkt auf.
+Text wie ein kopierter Terminalbefehl wird zurückgewiesen. Kopieren anderer
+Inhalte ersetzt weiterhin die vorgemerkten Dateien.
+
+Abweichend von den Beschreibungen der früheren Versionen: Bestehende Namen im
+Ziel oder doppelte Quellnamen brechen den gesamten Auftrag vorab ab. Es wird
+nichts automatisch überschrieben oder zusammengeführt. Bei Laufzeitfehlern
+kann eine Teilübertragung stattgefunden haben; Quelle/Ziel prüfen. Eine Move-
+Zwischenablage wird dann verworfen, damit kein blinder Wiederholungsversuch
+stattfindet. Keine eigene Quelllöschung. Auf Netzwerkfreigaben können Operationen
+lange laufen; während des synchronen Finder-Auftrags ist das App-Menü blockiert.
+
+Für Dateiaktionen ist Finder-Automation nötig; Bedienungshilfen und System Events
+bleiben für die Ansichts-Kurzbefehle nötig. Noch kein macOS-Laufzeittest.
+Regressionstest: Terminaltext kopieren → App-Einfügen muss abbrechen; zwei
+Testdateien ausschneiden → Ziel → App-Verschieben; Quell-/Zielbestand prüfen.

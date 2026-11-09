@@ -6,11 +6,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var status: NSStatusItem!
     var busy = false
     let help = """
-    FinderExtras 0.1.1 — lokale Testversion
+    FinderExtras 0.1.2 — lokale Testversion
 
     1. Dateien im Finder auswählen → Ausschneiden (vormerken).
     2. Zielordner öffnen → Hierher verschieben.
-    Finder führt die Übertragung und seine Konfliktdialoge aus.
+    Finder führt die Übertragung aus. Bestehende Zieldateien führen zum Abbruch.
     Ausschneiden kopiert zunächst nur: Erst Hierher verschieben bewegt Dateien.
     Ein späteres Kopieren ersetzt die Zwischenablage. Keine ausgegrauten Dateien.
 
@@ -121,8 +121,86 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Let the status menu close before sending input to Finder.
         DispatchQueue.main.async { self.run { try self.perform(action) } }
     }
+    func selectedFiles() throws -> [URL] {
+        let result = try script("""
+        tell application "Finder"
+            set paths to {}
+            repeat with f in (get selection)
+                set end of paths to POSIX path of (f as alias)
+            end repeat
+            return paths
+        end tell
+        """)
+        guard result.numberOfItems > 0 else { throw noSelection() }
+        return (1...result.numberOfItems).compactMap {
+            index in
+            guard let path = result.atIndex(index)?.stringValue else { return nil }
+            return URL(fileURLWithPath: path)
+        }
+    }
+    func capture(_ urls: [URL]) throws {
+        guard !urls.isEmpty else { throw noSelection() }
+        let board = NSPasteboard.general
+        board.clearContents()
+        guard board.writeObjects(urls.map { $0 as NSURL }) else {
+            throw NSError(domain: "FinderExtras", code: 7, userInfo: [NSLocalizedDescriptionKey: "Dateien konnten nicht in die Zwischenablage übernommen werden."])
+        }
+        status.button?.toolTip = "FinderExtras — \(urls.count) Datei(en) übernommen"
+    }
+    func transfer(move: Bool, target: URL? = nil) throws {
+        let board = NSPasteboard.general
+        let urls = files(board)
+        guard !urls.isEmpty else {
+            throw NSError(domain: "FinderExtras", code: 6, userInfo: [NSLocalizedDescriptionKey: "Die Zwischenablage enthält Text oder keine Dateien. Bitte zuerst Dateien mit FinderExtras ausschneiden oder kopieren."])
+        }
+        let destination: URL
+        if let target = target { destination = target }
+        else {
+            let result = try script("""
+            tell application "Finder"
+                if (count of Finder windows) is 0 then error "Bitte den Zielordner in einem Finder-Fenster öffnen."
+                return POSIX path of (target of front Finder window as alias)
+            end tell
+            """)
+            guard let path = result.stringValue else { throw noSelection() }
+            destination = URL(fileURLWithPath: path)
+        }
+        guard (try destination.resourceValues(forKeys: [.isDirectoryKey])).isDirectory == true else { throw noSelection() }
+        let aliases = urls.map { "(POSIX file \(literal($0.path)) as alias)" }.joined(separator: ", ")
+        let operation = move ? "move" : "duplicate"
+        // Preflight the whole selection before moving any item. Finder itself
+        // also refuses replacement; no 'with replacing' option is used.
+        let command = """
+        with timeout of 86400 seconds
+            tell application "Finder"
+                set destinationFolder to (POSIX file \(literal(destination.path)) as alias)
+                set sourceItems to {\(aliases)}
+                set seenNames to {}
+                repeat with sourceItem in sourceItems
+                    set itemName to name of sourceItem
+                    if itemName is in seenNames then error "Mehrere Quellen mit gleichem Namen. Bitte getrennt übertragen."
+                    set end of seenNames to itemName
+                    if exists item itemName of destinationFolder then error "Im Ziel existiert bereits: " & itemName
+                end repeat
+                \(operation) sourceItems to destinationFolder without replacing
+            end tell
+        end timeout
+        """
+        let changeCount = board.changeCount
+        do { try script(command) }
+        catch {
+            // A Finder error may follow a partial transfer. Never retry blindly.
+            if move && board.changeCount == changeCount { board.clearContents() }
+            throw NSError(domain: "FinderExtras", code: 8, userInfo: [NSLocalizedDescriptionKey: "Übertragung nicht vollständig bestätigt. Bitte Quelle und Ziel prüfen und verbleibende Dateien neu auswählen.\n\n" + error.localizedDescription])
+        }
+        if move && board.changeCount == changeCount { board.clearContents() }
+        status.button?.toolTip = "FinderExtras — Übertragung abgeschlossen"
+    }
     func perform(_ action: String) throws {
         switch action {
+        case "cut", "copy": try capture(selectedFiles())
+        case "move": try transfer(move: true)
+        case "paste": try transfer(move: false)
         case "register":
             NSUpdateDynamicServices()
             message("Dienste wurden zur erneuten Registrierung gemeldet. Bitte im Finder eine Datei auswählen und unter Finder → Dienste prüfen. Falls weiterhin nichts erscheint, einmal ab- und wieder anmelden.")
@@ -142,12 +220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard !paths.isEmpty else { throw noSelection() }
             copyPaths(paths)
         default:
-            if action == "move" || action == "paste" {
-                guard !files(NSPasteboard.general).isEmpty else {
-                    throw NSError(domain: "FinderExtras", code: 6, userInfo: [NSLocalizedDescriptionKey: "Die Zwischenablage enthält keine Dateien. Bitte zuerst Dateien im Finder kopieren oder Ausschneiden (vormerken) verwenden."])
-                }
-            }
-            if action == "cut" || action == "copy" || action == "group" {
+            if action == "group" {
                 try script("""
                 tell application "Finder"
                     set chosen to selection
@@ -157,10 +230,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 """)
             }
             let commands: [String: String] = [
-                "cut": "keystroke \"c\" using {command down}",
-                "copy": "keystroke \"c\" using {command down}",
-                "move": "keystroke \"v\" using {command down, option down}",
-                "paste": "keystroke \"v\" using {command down}",
                 "hidden": "keystroke \".\" using {command down, shift down}",
                 "pathbar": "keystroke \"p\" using {command down, option down}",
                 "preview": "keystroke \"p\" using {command down, shift down}",
@@ -197,21 +266,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard !urls.isEmpty else { throw self.noSelection() }
                 if action == "paths" { self.copyPaths(urls.map { $0.path }); return }
                 if action == "cut" {
-                    let aliases = urls.map { "(POSIX file \(self.literal($0.path)) as alias)" }.joined(separator: ", ")
-                    try self.script("tell application \"Finder\" to select {\(aliases)}")
-                    try self.perform("cut")
+                    try self.capture(urls)
                 } else if action == "move" {
                     guard urls.count == 1,
                           (try urls[0].resourceValues(forKeys: [.isDirectoryKey])).isDirectory == true else {
                         throw NSError(domain: "FinderExtras", code: 5, userInfo: [NSLocalizedDescriptionKey: "Bitte genau einen Zielordner auswählen."])
                     }
-                    try self.script("""
-                    tell application "Finder"
-                        activate
-                        make new Finder window to (POSIX file \(self.literal(urls[0].path)) as alias)
-                    end tell
-                    """)
-                    try self.perform("move")
+                    try self.transfer(move: true, target: urls[0])
                 }
             }
         }
