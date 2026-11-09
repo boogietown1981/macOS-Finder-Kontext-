@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>FinderExtras</string>
+	<key>CFBundleExecutable</key>
+	<string>FinderExtras</string>
+	<key>CFBundleIdentifier</key>
+	<string>de.itso.FinderExtras</string>
+	<key>CFBundleName</key>
+	<string>FinderExtras</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>FinderExtras steuert auf deinen Klick den Finder für Dateiaktionen und Ansichtsoptionen.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>FinderExtras – Ausschneiden (vormerken)</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>finderService</string>
+			<key>NSPortName</key>
+			<string>FinderExtras</string>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
+			</dict>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSFilenamesPboardType</string>
+				<string>public.file-url</string>
+			</array>
+			<key>NSUserData</key>
+			<string>cut</string>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>FinderExtras – In diesen Ordner verschieben</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>finderService</string>
+			<key>NSPortName</key>
+			<string>FinderExtras</string>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
+			</dict>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSFilenamesPboardType</string>
+				<string>public.file-url</string>
+			</array>
+			<key>NSUserData</key>
+			<string>move</string>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>FinderExtras – Pfade kopieren</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>finderService</string>
+			<key>NSPortName</key>
+			<string>FinderExtras</string>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
+			</dict>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSFilenamesPboardType</string>
+				<string>public.file-url</string>
+			</array>
+			<key>NSUserData</key>
+			<string>paths</string>
+		</dict>
+	</array>
+</dict>
+</plist>
