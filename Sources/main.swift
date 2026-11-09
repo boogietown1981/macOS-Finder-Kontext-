@@ -1,101 +1,76 @@
 import AppKit
 import ApplicationServices
+import FinderSync
+import Carbon
 
-// All mutations are delegated to Finder. No file is deleted by this app.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    var status: NSStatusItem!
+    var status: NSStatusItem?
+    var setupWindow: NSWindow?
+    var accessLabel = NSTextField(labelWithString: "")
+    var automationLabel = NSTextField(labelWithString: "")
+    var extensionLabel = NSTextField(labelWithString: "")
+    var progressLabel = NSTextField(wrappingLabelWithString: "Bereit. Wähle Dateien im Finder aus.")
+    var timer: Timer?
     var busy = false
-    let help = """
-    FinderExtras 0.1.2 — lokale Testversion
+    let marker = NSPasteboard.PasteboardType("de.itso.FinderExtras.operation")
 
-    1. Dateien im Finder auswählen → Ausschneiden (vormerken).
-    2. Zielordner öffnen → Hierher verschieben.
-    Finder führt die Übertragung aus. Bestehende Zieldateien führen zum Abbruch.
-    Ausschneiden kopiert zunächst nur: Erst Hierher verschieben bewegt Dateien.
-    Ein späteres Kopieren ersetzt die Zwischenablage. Keine ausgegrauten Dateien.
-
-    Rechtsklick → Dienste: Ausschneiden, in gewählten Ordner verschieben,
-    Pfade kopieren. Bei Bedarf unter Systemeinstellungen → Tastatur →
-    Tastaturkurzbefehle → Dienste aktivieren. Ein leerer Fensterbereich bietet
-    nicht immer Dienste; dafür das Menüleistensymbol verwenden.
-
-    Erlaubnisse: Datenschutz & Sicherheit → Bedienungshilfen → FinderExtras.
-    Zusätzlich Automation für Finder und System Events erlauben.
-    Die App sendet nur nach deinem Klick Finder-Kurzbefehle; kein Tastaturmonitor.
-
-    Optional: App zu Allgemein → Anmeldeobjekte hinzufügen.
-    Beenden über dieses Menü. Deinstallation: App beenden und aus
-    ~/Applications entfernen. Es werden keine Dateien oder Einstellungen
-    deiner Ordner verändert, außer durch bewusst ausgelöste Finder-Aktionen.
-    """
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         NSApp.servicesProvider = self
         NSUpdateDynamicServices()
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        status.button?.image = NSImage(systemSymbolName: "folder.badge.gearshape", accessibilityDescription: "FinderExtras")
-        status.button?.toolTip = "FinderExtras — Finder-Werkzeuge"
+        status?.button?.image = NSImage(systemSymbolName: "folder", accessibilityDescription: "FinderExtras")
+        status?.button?.image?.isTemplate = true
+        status?.button?.toolTip = "FinderExtras"
         let menu = NSMenu()
-        add(menu, "Ausschneiden (vormerken)", "cut")
-        add(menu, "Hierher verschieben", "move")
-        add(menu, "Kopieren", "copy")
-        add(menu, "Einfügen (Kopie)", "paste")
-        add(menu, "Pfade der Auswahl kopieren", "paths")
-        menu.addItem(.separator())
-        add(menu, "Versteckte Dateien ein/aus", "hidden")
-        add(menu, "Pfadleiste ein/aus", "pathbar")
-        add(menu, "Vorschauseitenleiste ein/aus", "preview")
-        add(menu, "Auswahl in neuen Ordner", "group")
-        add(menu, "Unterordner aufklappen (Listenansicht)", "expand")
-        add(menu, "Unterordner zuklappen (Listenansicht)", "collapse")
-        add(menu, "Schnellvorschau", "quicklook")
-        add(menu, "Diashow der Auswahl", "slideshow")
-        menu.addItem(.separator())
-        add(menu, "Gehe zum Ordner …", "goto")
-        add(menu, "Mit NAS / Server verbinden …", "server")
-        add(menu, "Übergeordneten Ordner öffnen", "parent")
-        menu.addItem(.separator())
-        add(menu, "Dienste neu registrieren", "register")
-        add(menu, "Hilfe und Einrichtung …", "help")
-        add(menu, "Beenden", "quit")
-        status.menu = menu
-        if !UserDefaults.standard.bool(forKey: "shownWelcome") {
-            UserDefaults.standard.set(true, forKey: "shownWelcome")
-            DispatchQueue.main.async { self.message(self.help) }
+        for (title, action) in [
+            ("Ausschneiden", "cut"), ("Kopieren", "copy"), ("Einfügen", "paste"),
+            ("Hierher verschieben", "move"), ("Als Kopie einfügen", "pasteCopy"),
+            ("Pfade kopieren", "paths"), ("—", ""),
+            ("Versteckte Dateien ein/aus", "hidden"), ("Pfadleiste ein/aus", "pathbar"),
+            ("Vorschauseitenleiste ein/aus", "preview"), ("Auswahl in neuen Ordner", "group"),
+            ("Unterordner aufklappen (Liste)", "expand"), ("Unterordner zuklappen (Liste)", "collapse"),
+            ("Schnellvorschau", "quicklook"), ("Diashow", "slideshow"),
+            ("Gehe zum Ordner …", "goto"), ("Mit Server verbinden …", "server"),
+            ("Übergeordneten Ordner öffnen", "parent"), ("—", ""),
+            ("Einrichtung & Status …", "setup"), ("Dienste neu registrieren", "register"), ("Beenden", "quit")
+        ] {
+            if action.isEmpty { menu.addItem(.separator()); continue }
+            let item = NSMenuItem(title: title, action: #selector(clicked(_:)), keyEquivalent: "")
+            item.target = self; item.representedObject = action; menu.addItem(item)
+        }
+        status?.menu = menu
+        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refreshPermissions() }
+        if UserDefaults.standard.string(forKey: "setupVersion") != "0.2" {
+            UserDefaults.standard.set("0.2", forKey: "setupVersion")
+            DispatchQueue.main.async { self.showSetup() }
         }
     }
-    func add(_ menu: NSMenu, _ title: String, _ action: String) {
-        let item = NSMenuItem(title: title, action: #selector(clicked(_:)), keyEquivalent: "")
-        item.target = self
-        item.representedObject = action
-        menu.addItem(item)
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if busy { message("Bitte die laufende Übertragung abwarten."); return .terminateCancel }
+        return .terminateNow
     }
     func message(_ text: String) {
         NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "FinderExtras"
-        alert.informativeText = text
-        alert.runModal()
+        let alert = NSAlert(); alert.messageText = "FinderExtras"; alert.informativeText = text; alert.runModal()
+    }
+    func run(_ operation: () throws -> Void) {
+        guard !busy else { message("Eine Übertragung läuft bereits."); return }
+        do { try operation() } catch { message(error.localizedDescription) }
+    }
+    @objc func clicked(_ sender: NSMenuItem) {
+        guard let action = sender.representedObject as? String else { return }
+        DispatchQueue.main.async { self.run { try self.perform(action) } }
     }
     @discardableResult func script(_ source: String) throws -> NSAppleEventDescriptor {
         var error: NSDictionary?
-        guard let script = NSAppleScript(source: source) else {
-            throw NSError(domain: "FinderExtras", code: 1, userInfo: [NSLocalizedDescriptionKey: "AppleScript konnte nicht erstellt werden."])
-        }
+        guard let script = NSAppleScript(source: source) else { throw TransferFailure(message: "AppleScript konnte nicht erstellt werden.") }
         let result = script.executeAndReturnError(&error)
-        if let error = error {
-            throw NSError(domain: "FinderExtras", code: 2, userInfo: [NSLocalizedDescriptionKey: "\(error)"])
-        }
+        if let error = error { throw TransferFailure(message: "\(error)") }
         return result
     }
-    // Escaping prevents filenames from becoming executable AppleScript.
-    func literal(_ value: String) -> String {
-        "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
-    }
     func key(_ command: String) throws {
-        guard AXIsProcessTrusted() else {
-            throw NSError(domain: "FinderExtras", code: 3, userInfo: [NSLocalizedDescriptionKey: "Bitte FinderExtras unter Systemeinstellungen → Datenschutz & Sicherheit → Bedienungshilfen erlauben und erneut versuchen."])
-        }
+        guard AXIsProcessTrusted() else { showSetup(); throw TransferFailure(message: "Diese Ansichtsaktion benötigt Bedienungshilfen. Bitte im Einrichtungsfenster freigeben.") }
         try script("""
         tell application "Finder" to activate
         tell application "System Events"
@@ -110,17 +85,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         end tell
         """)
     }
-    func run(_ operation: () throws -> Void) {
-        guard !busy else { return }
-        busy = true
-        defer { busy = false }
-        do { try operation() } catch { message(error.localizedDescription) }
-    }
-    @objc func clicked(_ item: NSMenuItem) {
-        guard let action = item.representedObject as? String else { return }
-        // Let the status menu close before sending input to Finder.
-        DispatchQueue.main.async { self.run { try self.perform(action) } }
-    }
     func selectedFiles() throws -> [URL] {
         let result = try script("""
         tell application "Finder"
@@ -131,152 +95,194 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return paths
         end tell
         """)
-        guard result.numberOfItems > 0 else { throw noSelection() }
-        return (1...result.numberOfItems).compactMap {
-            index in
+        guard result.numberOfItems > 0 else { throw TransferFailure(message: "Bitte zuerst Dateien auswählen.") }
+        return (1...result.numberOfItems).compactMap { index in
             guard let path = result.atIndex(index)?.stringValue else { return nil }
             return URL(fileURLWithPath: path)
         }
     }
-    func capture(_ urls: [URL]) throws {
-        guard !urls.isEmpty else { throw noSelection() }
-        let board = NSPasteboard.general
-        board.clearContents()
-        guard board.writeObjects(urls.map { $0 as NSURL }) else {
-            throw NSError(domain: "FinderExtras", code: 7, userInfo: [NSLocalizedDescriptionKey: "Dateien konnten nicht in die Zwischenablage übernommen werden."])
-        }
-        status.button?.toolTip = "FinderExtras — \(urls.count) Datei(en) übernommen"
-    }
-    func transfer(move: Bool, target: URL? = nil) throws {
-        let board = NSPasteboard.general
-        let urls = files(board)
-        guard !urls.isEmpty else {
-            throw NSError(domain: "FinderExtras", code: 6, userInfo: [NSLocalizedDescriptionKey: "Die Zwischenablage enthält Text oder keine Dateien. Bitte zuerst Dateien mit FinderExtras ausschneiden oder kopieren."])
-        }
-        let destination: URL
-        if let target = target { destination = target }
-        else {
-            let result = try script("""
-            tell application "Finder"
-                if (count of Finder windows) is 0 then error "Bitte den Zielordner in einem Finder-Fenster öffnen."
-                return POSIX path of (target of front Finder window as alias)
-            end tell
-            """)
-            guard let path = result.stringValue else { throw noSelection() }
-            destination = URL(fileURLWithPath: path)
-        }
-        guard (try destination.resourceValues(forKeys: [.isDirectoryKey])).isDirectory == true else { throw noSelection() }
-        let aliases = urls.map { "(POSIX file \(literal($0.path)) as alias)" }.joined(separator: ", ")
-        let operation = move ? "move" : "duplicate"
-        // Preflight the whole selection before moving any item. Finder itself
-        // also refuses replacement; no 'with replacing' option is used.
-        let command = """
-        with timeout of 86400 seconds
-            tell application "Finder"
-                set destinationFolder to (POSIX file \(literal(destination.path)) as alias)
-                set sourceItems to {\(aliases)}
-                set seenNames to {}
-                repeat with sourceItem in sourceItems
-                    set itemName to name of sourceItem
-                    if itemName is in seenNames then error "Mehrere Quellen mit gleichem Namen. Bitte getrennt übertragen."
-                    set end of seenNames to itemName
-                    if exists item itemName of destinationFolder then error "Im Ziel existiert bereits: " & itemName
-                end repeat
-                \(operation) sourceItems to destinationFolder without replacing
-            end tell
-        end timeout
-        """
-        let changeCount = board.changeCount
-        do { try script(command) }
-        catch {
-            // A Finder error may follow a partial transfer. Never retry blindly.
-            if move && board.changeCount == changeCount { board.clearContents() }
-            throw NSError(domain: "FinderExtras", code: 8, userInfo: [NSLocalizedDescriptionKey: "Übertragung nicht vollständig bestätigt. Bitte Quelle und Ziel prüfen und verbleibende Dateien neu auswählen.\n\n" + error.localizedDescription])
-        }
-        if move && board.changeCount == changeCount { board.clearContents() }
-        status.button?.toolTip = "FinderExtras — Übertragung abgeschlossen"
-    }
-    func perform(_ action: String) throws {
-        switch action {
-        case "cut", "copy": try capture(selectedFiles())
-        case "move": try transfer(move: true)
-        case "paste": try transfer(move: false)
-        case "register":
-            NSUpdateDynamicServices()
-            message("Dienste wurden zur erneuten Registrierung gemeldet. Bitte im Finder eine Datei auswählen und unter Finder → Dienste prüfen. Falls weiterhin nichts erscheint, einmal ab- und wieder anmelden.")
-        case "help": message(help)
-        case "quit": NSApp.terminate(nil)
-        case "paths":
-            let result = try script("""
-            tell application "Finder"
-                set paths to {}
-                repeat with f in (get selection)
-                    set end of paths to POSIX path of (f as alias)
-                end repeat
-                return paths
-            end tell
-            """)
-            let paths = (1...max(1, result.numberOfItems)).compactMap { result.atIndex($0)?.stringValue }
-            guard !paths.isEmpty else { throw noSelection() }
-            copyPaths(paths)
-        default:
-            if action == "group" {
-                try script("""
-                tell application "Finder"
-                    set chosen to selection
-                    if (count of chosen) is 0 then error "Bitte zuerst Dateien im Finder auswählen."
-                    select chosen
-                end tell
-                """)
-            }
-            let commands: [String: String] = [
-                "hidden": "keystroke \".\" using {command down, shift down}",
-                "pathbar": "keystroke \"p\" using {command down, option down}",
-                "preview": "keystroke \"p\" using {command down, shift down}",
-                "group": "keystroke \"n\" using {command down, control down}",
-                "expand": "key code 124 using {option down}",
-                "collapse": "key code 123 using {option down}",
-                "quicklook": "keystroke \"y\" using {command down}",
-                "slideshow": "keystroke \"y\" using {command down, option down}",
-                "goto": "keystroke \"g\" using {command down, shift down}",
-                "server": "keystroke \"k\" using {command down}",
-                "parent": "key code 126 using {command down}"
-            ]
-            if let command = commands[action] { try key(command) }
-        }
-    }
-    func noSelection() -> NSError {
-        NSError(domain: "FinderExtras", code: 4, userInfo: [NSLocalizedDescriptionKey: "Bitte Dateien oder einen Zielordner im Finder auswählen."])
-    }
-    func copyPaths(_ paths: [String]) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(paths.joined(separator: "\n"), forType: .string)
+    func currentFolder() throws -> URL {
+        let result = try script("""
+        tell application "Finder"
+            if (count of Finder windows) is 0 then error "Bitte einen Zielordner im Finder öffnen."
+            return POSIX path of (target of front Finder window as alias)
+        end tell
+        """)
+        guard let path = result.stringValue else { throw TransferFailure(message: "Zielordner nicht ermittelbar.") }
+        return URL(fileURLWithPath: path)
     }
     func files(_ board: NSPasteboard) -> [URL] {
         if let urls = board.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty { return urls }
-        let legacy = NSPasteboard.PasteboardType("NSFilenamesPboardType")
-        return (board.propertyList(forType: legacy) as? [String] ?? []).map { URL(fileURLWithPath: $0) }
+        return (board.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String] ?? []).filter { $0.hasPrefix("/") }.map { URL(fileURLWithPath: $0) }
+    }
+    func capture(_ urls: [URL], cut: Bool) throws {
+        guard !urls.isEmpty else { throw TransferFailure(message: "Keine Dateien ausgewählt.") }
+        let board = NSPasteboard.general; board.clearContents()
+        guard board.writeObjects(urls.map { $0 as NSURL }) else { throw TransferFailure(message: "Zwischenablage konnte nicht beschrieben werden.") }
+        board.setString(cut ? "move" : "copy", forType: marker)
+        let text = "\(urls.count) Objekt(e) zum \(cut ? "Verschieben" : "Kopieren") vorgemerkt."
+        progressLabel.stringValue = text; status?.button?.toolTip = "FinderExtras — " + text
+    }
+    func copyPaths(_ urls: [URL]) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(urls.map { $0.path }.joined(separator: "\n"), forType: .string)
+    }
+    func transfer(mode: String, target: URL? = nil) throws {
+        let board = NSPasteboard.general
+        let sources = files(board)
+        guard !sources.isEmpty else { throw TransferFailure(message: "Die Zwischenablage enthält keine Dateien. Bitte zuerst Dateien ausschneiden oder kopieren.") }
+        let move = mode == "move" || (mode == "paste" && board.string(forType: marker) == "move")
+        let destination: URL
+        if let target = target { destination = target } else { destination = try currentFolder() }
+        let plan = try TransferEngine().plan(sources, into: destination)
+        // Also protects the URL entry point: no external URL can silently move files.
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "\(sources.count) Objekt(e) \(move ? "verschieben" : "kopieren")?"
+        alert.informativeText = "Ziel: \(destination.path)\n\n" + (move ? "Nach erfolgreicher Übertragung sind die Dateien am bisherigen Ort nicht mehr vorhanden." : "Die Quelldateien bleiben erhalten.")
+        alert.addButton(withTitle: move ? "Verschieben" : "Kopieren"); alert.addButton(withTitle: "Abbrechen")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let count = board.changeCount
+        busy = true; showSetup()
+        progressLabel.stringValue = "Übertragung startet …"
+        DispatchQueue.global(qos: .userInitiated).async {
+            var failure: String?
+            do {
+                try TransferEngine().execute(plan, move: move) { index, name in
+                    DispatchQueue.main.async { self.progressLabel.stringValue = "\(move ? "Verschiebe" : "Kopiere") \(index + 1)/\(plan.count): \(name)" }
+                }
+            } catch { failure = error.localizedDescription }
+            let result = failure
+            DispatchQueue.main.async {
+                self.busy = false
+                if move && board.changeCount == count { board.clearContents() }
+                let summary = result ?? "\(plan.count) Objekt(e) \(move ? "verschoben; Quellen entfernt" : "kopiert; Quellen erhalten")."
+                self.progressLabel.stringValue = summary
+                self.status?.button?.toolTip = "FinderExtras — " + summary
+                if let result = result { self.message(result) }
+            }
+        }
+    }
+    func perform(_ action: String) throws {
+        switch action {
+        case "cut", "copy": try capture(selectedFiles(), cut: action == "cut")
+        case "paste", "move", "pasteCopy": try transfer(mode: action)
+        case "paths": copyPaths(try selectedFiles())
+        case "setup": showSetup()
+        case "register": NSUpdateDynamicServices(); showSetup()
+        case "quit": NSApp.terminate(nil)
+        default:
+            let keys = ["hidden":"keystroke \".\" using {command down, shift down}", "pathbar":"keystroke \"p\" using {command down, option down}", "preview":"keystroke \"p\" using {command down, shift down}", "group":"keystroke \"n\" using {command down, control down}", "expand":"key code 124 using {option down}", "collapse":"key code 123 using {option down}", "quicklook":"keystroke \"y\" using {command down}", "slideshow":"keystroke \"y\" using {command down, option down}", "goto":"keystroke \"g\" using {command down, shift down}", "server":"keystroke \"k\" using {command down}", "parent":"key code 126 using {command down}"]
+            if let keyCommand = keys[action] { try key(keyCommand) }
+        }
     }
     @objc func finderService(_ board: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        let urls = files(board)
-        let action = userData ?? "paths"
-        // Services must return promptly; the pasteboard is captured before returning.
+        let urls = files(board); let action = userData ?? "paths"
         DispatchQueue.main.async {
             self.run {
-                guard !urls.isEmpty else { throw self.noSelection() }
-                if action == "paths" { self.copyPaths(urls.map { $0.path }); return }
-                if action == "cut" {
-                    try self.capture(urls)
-                } else if action == "move" {
-                    guard urls.count == 1,
-                          (try urls[0].resourceValues(forKeys: [.isDirectoryKey])).isDirectory == true else {
-                        throw NSError(domain: "FinderExtras", code: 5, userInfo: [NSLocalizedDescriptionKey: "Bitte genau einen Zielordner auswählen."])
+                guard !urls.isEmpty else { throw TransferFailure(message: "Keine Dateien übergeben.") }
+                if action == "cut" { try self.capture(urls, cut: true) }
+                else if action == "paths" { self.copyPaths(urls) }
+                else if action == "move", urls.count == 1 { try self.transfer(mode: "move", target: urls[0]) }
+            }
+        }
+    }
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard url.scheme == "finderextras", url.host == "action", url.absoluteString.count < 1000000,
+                  let payload = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "payload" })?.value,
+                  let data = Data(base64Encoded: payload),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let action = object["action"] as? String, ["cut","copy","paths","paste","move"].contains(action),
+                  let paths = object["paths"] as? [String], paths.allSatisfy({ $0.hasPrefix("/") && !$0.contains("\0") }) else { continue }
+            let selection = paths.map { URL(fileURLWithPath: $0) }
+            DispatchQueue.main.async {
+                self.run {
+                    if action == "cut" || action == "copy" { try self.capture(selection, cut: action == "cut") }
+                    else if action == "paths" { self.copyPaths(selection) }
+                    else if let target = object["target"] as? String, target.hasPrefix("/"), !target.contains("\0") {
+                        try self.transfer(mode: action, target: URL(fileURLWithPath: target))
                     }
-                    try self.transfer(move: true, target: urls[0])
                 }
             }
         }
     }
+
+    func permission(_ bundle: String, prompt: Bool = false) -> OSStatus {
+        let target = NSAppleEventDescriptor(descriptorType: typeApplicationBundleID, data: Data(bundle.utf8))
+        return AEDeterminePermissionToAutomateTarget(target.aeDesc, typeWildCard, typeWildCard, prompt)
+    }
+    func refreshPermissions() {
+        guard setupWindow?.isVisible == true else { return }
+        accessLabel.stringValue = AXIsProcessTrusted() ? "✓ Bedienungshilfen freigegeben" : "○ Bedienungshilfen noch nicht freigegeben"
+        extensionLabel.stringValue = FIFinderSyncController.isExtensionEnabled ? "✓ Finder-Erweiterung aktiviert" : "○ Finder-Erweiterung noch nicht aktiviert"
+        let finder = permission("com.apple.finder") == noErr
+        let events = permission("com.apple.systemevents") == noErr
+        automationLabel.stringValue = "Finder: \(finder ? "✓ erlaubt" : "○ offen")   ·   System Events: \(events ? "✓ erlaubt" : "○ offen")"
+    }
+    func showSetup() {
+        if setupWindow == nil { buildSetup() }
+        NSApp.activate(ignoringOtherApps: true)
+        setupWindow?.makeKeyAndOrderFront(nil); refreshPermissions()
+    }
+    func buildSetup() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 670), styleMask: [.titled,.closable,.miniaturizable], backing: .buffered, defer: false)
+        window.title = "FinderExtras · Einrichtung & Status"; window.isReleasedWhenClosed = false; window.center()
+        let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.drawsBackground = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        let document = NSView(); document.translatesAutoresizingMaskIntoConstraints = false
+        scroll.documentView = document; document.addSubview(stack)
+        window.contentView!.addSubview(scroll)
+        NSLayoutConstraint.activate([
+            scroll.leadingAnchor.constraint(equalTo: window.contentView!.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: window.contentView!.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: window.contentView!.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: window.contentView!.bottomAnchor),
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            stack.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 28),
+            stack.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -28),
+            stack.topAnchor.constraint(equalTo: document.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -24)])
+        func text(_ value: String, bold: Bool = false) {
+            let label = NSTextField(wrappingLabelWithString: value)
+            label.font = bold ? .boldSystemFont(ofSize: 17) : .systemFont(ofSize: 12)
+            stack.addArrangedSubview(label); label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+        func button(_ title: String, selector: Selector) {
+            let button = NSButton(title: title, target: self, action: selector); button.bezelStyle = .rounded; stack.addArrangedSubview(button)
+        }
+        text("FinderExtras 0.2.0", bold: true)
+        text("Ausschneiden → Einfügen verschiebt. Kopieren → Einfügen kopiert. Vor jeder Übertragung zeigt die App das Ziel und die Aktion. Gleichnamige Zieldateien werden nicht ersetzt.")
+        stack.addArrangedSubview(extensionLabel)
+        text("1 · Für die Einträge direkt im Finder-Rechtsklickmenü die FinderExtras-Erweiterung aktivieren. macOS bestimmt die Reihenfolge. Dienste bleiben als Alternative verfügbar.")
+        button("Finder-Erweiterung aktivieren …", selector: #selector(openExtensions))
+        stack.addArrangedSubview(automationLabel)
+        text("2 · Finder-Automation liest die Auswahl für das Menüleistensymbol. System Events steuert nur die zusätzlichen Ansichtsaktionen. Die direkten Kontext-Dateiaktionen benötigen beides nicht.")
+        button("Automation anfragen …", selector: #selector(requestAutomation))
+        stack.addArrangedSubview(accessLabel)
+        text("3 · Bedienungshilfen erlauben die Ansichts-Kurzbefehle. Nach lokalen Updates kann eine erneute Freigabe nötig sein. Vollzugriff auf die Festplatte ist keine Standardanforderung.")
+        button("Bedienungshilfen freigeben …", selector: #selector(requestAccessibility))
+        button("Installierte App im Finder zeigen", selector: #selector(revealApp))
+        text("Dateizugriff: macOS fragt geschützte Ordner bei Bedarf an. Freigaben lassen sich nicht stillschweigend einschalten. Für NAS müssen die Freigabe verbunden und Schreib-/Löschrechte vorhanden sein.")
+        let separator = NSBox(); separator.boxType = .separator; stack.addArrangedSubview(separator); separator.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        stack.addArrangedSubview(progressLabel); progressLabel.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        setupWindow = window
+    }
+    @objc func openExtensions() { FIFinderSyncController.showExtensionManagementInterface() }
+    @objc func requestAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+        NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+    @objc func requestAutomation() {
+        _ = permission("com.apple.finder", prompt: true)
+        _ = permission("com.apple.systemevents", prompt: true)
+        NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
+        refreshPermissions()
+    }
+    @objc func revealApp() { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
 }
 let app = NSApplication.shared
 let delegate = AppDelegate()

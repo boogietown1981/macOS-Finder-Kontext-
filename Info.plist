@@ -6,6 +6,8 @@
 	<string>FinderExtras</string>
 	<key>CFBundleExecutable</key>
 	<string>FinderExtras</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>de.itso.FinderExtras</string>
 	<key>CFBundleName</key>
@@ -13,15 +15,32 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.2</string>
+	<string>0.2.0</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>de.itso.FinderExtras.actions</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>finderextras</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
-	<string>3</string>
+	<string>4</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>FinderExtras steuert auf deinen Klick den Finder für Dateiaktionen und Ansichtsoptionen.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
 	<key>NSServices</key>
 	<array>
 		<dict>

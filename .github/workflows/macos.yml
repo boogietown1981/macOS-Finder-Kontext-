@@ -1,0 +1,22 @@
+name: macOS build and file operations
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test file operations including another volume
+        run: TEST_CROSS_VOLUME=1 bash Tests/run.sh
+      - name: Build native app and Finder extension
+        run: bash Build.command "$RUNNER_TEMP/FinderExtras-build"
+      - name: Package app
+        run: ditto -c -k --keepParent "$RUNNER_TEMP/FinderExtras-build/FinderExtras.app" "$RUNNER_TEMP/FinderExtras-0.2.0-macOS.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FinderExtras-0.2.0-macOS
+          path: ${{ runner.temp }}/FinderExtras-0.2.0-macOS.zip

@@ -21,15 +21,8 @@ if [[ -e "$APP" ]]; then
 fi
 BUILD="$(mktemp -d "${TMPDIR:-/tmp}/finderextras.XXXXXX")"
 trap 'rm -rf "$BUILD"' EXIT
+bash Build.command "$BUILD"
 BUNDLE="$BUILD/FinderExtras.app"
-mkdir -p "$BUNDLE/Contents/MacOS"
-cp Info.plist "$BUNDLE/Contents/Info.plist"
-# Build for the Mac running this installer, including Intel Macs.
-xcrun swiftc -swift-version 5 -O -target "$(uname -m)-apple-macosx12.0" \
-    -framework AppKit -framework ApplicationServices Sources/main.swift \
-    -o "$BUNDLE/Contents/MacOS/FinderExtras"
-codesign --force --sign - "$BUNDLE"
-codesign --verify --strict "$BUNDLE"
 mkdir -p "$HOME/Applications"
 if [[ -e "$APP" ]]; then
     BACKUP="$HOME/Library/Application Support/FinderExtras/Backups/$(date +%Y%m%d-%H%M%S)-$$.zip"
@@ -51,6 +44,7 @@ fi
 if [[ -x /System/Library/CoreServices/pbs ]]; then
     /System/Library/CoreServices/pbs -update || echo "Dienste bitte nach Ab-/Anmelden erneut prüfen."
 fi
+/usr/bin/pluginkit -a "$APP/Contents/PlugIns/FinderExtrasSync.appex"
 open "$APP"
 echo "Installiert: $APP"
 echo "Die Einrichtung steht unter FinderExtras → Hilfe und Einrichtung."

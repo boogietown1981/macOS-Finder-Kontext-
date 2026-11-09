@@ -1,131 +1,97 @@
-# FinderExtras 0.1.2
+# FinderExtras 0.2.0
 
-Kleine native Swift/AppKit-App für macOS ab 12, Intel und Apple Silicon.
-Lokale Testversion: Quellcode erstellt und statisch geprüft, noch nicht auf
-macOS kompiliert oder im Finder ausgeführt. Kein fertiges signiertes Binary.
+Native macOS-App für Intel und Apple Silicon, ab macOS 12. Menüleiste,
+Finder-Kontextmenü und geführte Einrichtung. Quellcode und lokale Installation
+sind unabhängig von kostenpflichtigen Abhängigkeiten.
 
-## Installation
+## Neu in 0.2.0
 
-1. ZIP entpacken.
-2. `Installieren.command` doppelklicken. Alternativ im Terminal `bash ` eingeben,
-   die Datei ins Terminal ziehen und Enter drücken.
-3. Fehlen Apples Command Line Tools, `xcode-select --install` ausführen,
-   Installation abschließen und Schritt 2 wiederholen. Vollständiges Xcode
-   ist nicht nötig. Der Installer lädt keine fremden Abhängigkeiten herunter.
-4. App wird lokal gebaut, ad-hoc signiert und nach `~/Applications` installiert.
-   Die eigene vorherige Version wird nach erfolgreichem Build gesichert und ersetzt.
-   Vor dem Update FinderExtras über das Menüleistensymbol beenden.
-5. Unter Datenschutz & Sicherheit → Bedienungshilfen die installierte App
-   hinzufügen und erlauben. Bei der ersten Aktion Automation für Finder und
-   System Events erlauben. Kein Vollzugriff auf die Festplatte erforderlich.
-6. Dienste bei Bedarf unter Tastatur → Tastaturkurzbefehle → Dienste aktivieren.
-   Erscheinen sie noch nicht, einmal ab- und wieder anmelden.
+- Ausschneiden erhält einen eigenen Zwischenablage-Status. **Einfügen** verschiebt
+  danach; nach **Kopieren** kopiert es. **Als Kopie einfügen** behält die Quellen.
+- Dateibewegungen verwenden FileManager.moveItem, auch über Volume-Grenzen.
+  Nach Erfolg prüft die App Zielvorhandensein und Quellabwesenheit. Es gibt keine
+  zusätzliche manuelle Quelllöschung und keine Erfolgsmeldung bei verbleibender Quelle.
+- Finder-Sync-Erweiterung mit Einträgen ohne „Dienste“-Untermenü. Apple bestimmt
+  Position und Sichtbarkeit. In Cloud-/File-Provider-Bereichen können Einträge
+  fehlen; Dienste und Menüleiste bleiben als Alternative.
+- Dezentes blau-graues Ordner-Icon mit zwei Pfeilen, monochromes Menüleistensymbol.
+- Einrichtungsfenster mit Status und Freigabe-Schaltflächen für Finder-Erweiterung,
+  Automation und Bedienungshilfen. Automatisches Öffnen beim ersten 0.2-Start.
 
-Die lokal erstellte App ist nicht von Apple notarisiert. Gatekeeper und andere
-macOS-Schutzfunktionen sollen nicht deaktiviert werden.
+## Installation / Update
+
+1. ZIP entpacken; laufendes FinderExtras über sein Menü beenden.
+2. `Installieren.command` starten (alternativ `bash ` im Terminal eingeben und
+   die Datei hineinziehen). Falls nötig zuerst `xcode-select --install` ausführen.
+3. Der Installer baut App, Icon und Erweiterung, signiert lokal und installiert
+   nach `~/Applications/FinderExtras.app`. Vorhandene eigene Versionen werden als
+   ZIP in `~/Library/Application Support/FinderExtras/Backups` gesichert.
+4. Im automatisch geöffneten Einrichtungsfenster **Finder-Erweiterung aktivieren**
+   wählen und FinderExtras in macOS einschalten. Je nach macOS-Version liegt
+   dies bei Erweiterungen oder Allgemein → Anmeldeobjekte & Erweiterungen → Finder.
+5. Automation für Finder/System Events und Bedienungshilfen nach Bedarf erlauben.
+   Die App stellt die Anfragen und zeigt den Status; macOS verlangt deine Bestätigung.
+
+Die direkte Kontext-Dateiauswahl kommt aus der Erweiterung und benötigt keine
+Bedienungshilfen. Menüleisten-Dateiauswahl benötigt Finder-Automation.
+Ansichts-Kurzbefehle benötigen zusätzlich System Events und Bedienungshilfen.
+Geschützte Ordner können separate macOS-Dateizugriffsfragen auslösen. Kein pauschaler
+Festplattenvollzugriff wird angefordert. Ein NAS muss verbunden sein und Schreib-
+sowie Löschrechte erlauben.
+
+Lokale Ad-hoc-Signierung ist kein Developer-ID-Zertifikat und keine Notarisierung.
+Nach Neubauten können Rechte erneut nötig sein. Ein vorhandenes eigenes Zertifikat
+kann über `FINDEREXTRAS_SIGNING_IDENTITY` beim Build gewählt werden. SIP/Gatekeeper
+und die Berechtigungsdatenbank werden nicht verändert. Bereits erteilte Rechte
+werden nicht automatisch zurückgesetzt.
 
 ## Bedienung
 
-Menüleistensymbol → Ausschneiden (vormerken), Zielordner im Finder öffnen,
-Menüleistensymbol → Hierher verschieben. Die native Finder-Zwischenablage wird
-verwendet. Ausschneiden löscht nichts: Es entspricht zunächst Kopieren.
-Erst „Hierher verschieben“ ruft die native Bewegungsfunktion auf. Weitere
-Kopieraktionen ersetzen die vorgemerkte Auswahl. Dateien werden nicht verblasst
-angezeigt. „Einfügen (Kopie)“ kopiert stattdessen.
+Dateien markieren → **Ausschneiden** → Zielordner → **Hier einfügen · FinderExtras**.
+Vor der Ausführung zeigt ein Dialog explizit „Verschieben“ und den Zielpfad.
+Im Menüleistensymbol heißt der entsprechende Eintrag **Einfügen**.
+**Hierher verschieben** erzwingt Verschieben; **Als Kopie einfügen** erzwingt Kopieren.
+Die normalen Apple-Finder-Einträge sind davon unabhängig: Apples normales „Einsetzen“
+kennt unseren Ausschneiden-Status nicht. Verwende den FinderExtras-Eintrag.
+Das Kopieren anderer Inhalte ersetzt die vorgemerkten Dateien.
 
-Im Kontextmenü ausgewählter Dateien unter **Dienste**:
-- FinderExtras – Ausschneiden (vormerken)
-- FinderExtras – In diesen Ordner verschieben (genau einen Zielordner auswählen)
-- FinderExtras – Pfade kopieren
+Vorhandene Ziele, doppelte Namen und eine Auswahl von Elternordner plus Kind werden
+vorab abgelehnt. Keine Zusammenführung oder Überschreibung. Der Zielpfad wird vor
+jeder Übertragung bestätigt, auch zum Schutz des App-URL-Einstiegspunkts.
+Bei Fehlern kann eine Teilübertragung stattgefunden haben; Details und Zahl der
+abgeschlossenen Objekte werden angezeigt. Quelle/Ziel prüfen, verbleibende Quellen
+neu auswählen. Keine automatische Wiederholung. Nach Move wird die unveränderte
+Zwischenablage geleert. Übertragung im Hintergrund, Fortschritt pro Objekt;
+kein bytegenauer Fortschritt, kein Abbrechen mitten in einer Datei, kein Undo.
 
-Dies ist eine native macOS-Diensteintegration, kein Finder-Sync-Plug-in.
-Keine garantierten Einträge direkt auf oberster Kontextmenüebene und keine
-Dienste beim Rechtsklick auf einen leeren Fensterbereich. Dafür dient das
-Menüleistensymbol. Finder Sync ist laut Apple für Synchronisationsintegration
-vorgesehen; diese App nutzt die allgemeine Services-Schnittstelle.
+Die Erweiterung registriert den Dateibaum für Kontextmenüs; sie scannt keine
+Dateien und setzt keine Badges. Sie übergibt Auswahl und Ziel an die Haupt-App.
+Die Haupt-App erledigt die Dateioperationen. Dienste bleiben registriert.
 
-Weitere Menüleistenaktionen: versteckte Dateien, Pfadleiste und Vorschau
-umschalten, Auswahl in neuen Ordner packen, Unterordner auf-/zuklappen in der
-Listenansicht, Vorschau/Diashow, Pfade kopieren, Gehe zum Ordner, Server verbinden,
-übergeordneten Ordner öffnen.
+## Build und Tests
 
-Aktionen beziehen sich auf das vorderste Finder-Fenster bzw. dessen Auswahl.
-Während eines Befehls nicht zwischen Fenstern wechseln. Keine Texteingabe,
-Umbenennung oder modalen Dialoge im Finder offen lassen. Normale Finder-
-Kurzbefehle müssen unverändert sein. Die App sendet Kurzbefehle auf ausdrücklichen
-Klick; sie liest keine globalen Tastatureingaben. Finder bearbeitet Dateiübertragung,
-Fortschritt und Namenskonflikte. Die App stellt keine eigene Transferwarteschlange
-bereit und behauptet nicht, dass ein gesendeter Kurzbefehl bereits erfolgreich
-abgeschlossen ist. Keine manuelle Quelllöschung oder automatische Ersetzung.
+```bash
+bash Build.command
+TEST_CROSS_VOLUME=1 bash Tests/run.sh
+```
 
-Für Drag-and-drop-Varianten gibt es keine gleichwertige Menüaktion ohne Zielwahl;
-gezieltes Verschieben/Kopieren erfolgt hier über die Zwischenablage.
+GitHub Actions baut auf einem macOS-Runner App und Finder-Erweiterung und testet
+Moves auf demselben Volume und auf einem temporären Disk-Image, Copy, Konflikte,
+verschachtelte Auswahl, symbolische Links und eine nachträglich belegte Zieldatei.
+Das Workflow-Artefakt enthält eine lokal signierte App für die Runner-Architektur.
+Ein grüner Build ersetzt keinen interaktiven Test der Finder-Erweiterung, der
+Berechtigungsdialoge oder deiner konkreten NAS-Freigabe.
 
-## Prüfung auf dem Mac (zuerst mit Testdateien)
+Manueller Test: kleine Testdateien zunächst lokal, danach NAS/externe SSD verschieben;
+Quelle muss verschwunden, Zielinhalt korrekt sein. Danach Kopieren prüfen (Quelle
+bleibt). Erweiterung aktivieren und Kontextmenü auf Datei, Ordner und freier Fläche
+prüfen. Setup bei abgelehnten und erteilten Rechten testen.
 
-- Installer muss ohne Compilerfehler enden; Symbol erscheint oben rechts.
-- Erlaubnis verweigern: verständliche Meldung; danach erlauben und erneut testen.
-- Zwei Testdateien vormerken, in zweiten Ordner bewegen: nur dort vorhanden.
-- Dasselbe mit „Einfügen (Kopie)“: Quellen bleiben vorhanden.
-- Namenskonflikt erzeugen: Finder-Dialog prüfen, abbrechen, Quellen kontrollieren.
-- Externe SSD / NAS: erst kleine Testdateien, dann größere Datei testen.
-- Kontextdienste mit Leerzeichen, Umlauten und Anführungszeichen im Namen testen.
-- Leere Auswahl / Text-Zwischenablage / mehrere Zielordner: Fehlermeldung prüfen.
-- Alle Ansichtsaktionen im normalen Finder-Fenster testen.
+Deinstallation: App beenden, Finder-Erweiterung deaktivieren, App löschen.
+Sicherungen im oben genannten Verzeichnis können separat entfernt werden.
 
-## Entwicklung und Grenzen
+## Quellen
 
-`Sources/main.swift`: App, Services-Provider und AppleScript-Brücke.
-`Info.plist`: Services-Deklarationen und Automation-Begründung.
-`Installieren.command`: reproduzierbarer Build für die Architektur des Macs.
-
-Kein Hintergrundscan, kein Netzwerkzugriff durch die App, kein Autostart ohne
-Benutzereinrichtung. AppleScript und AppKit sind hier nicht verfügbar; deshalb
-noch keine Aussage zu erfolgreichem macOS-Build oder getesteter Laufzeit.
-Bei Problemen bitte Compiler-Ausgabe bzw. genaue Aktion und macOS-Version teilen.
-
-Deinstallation: App beenden und `~/Applications/FinderExtras.app` löschen;
-optional aus Anmeldeobjekten entfernen. Dienste werden nach Ab-/Anmelden entfernt.
-
-Quellen:
-- https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/SysServices/Articles/properties.html
+- https://developer.apple.com/documentation/foundation/filemanager/moveitem(at:to:)
 - https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Finder.html
-- https://support.apple.com/de-ch/102650
-
-## Änderung 0.1.1: Fehlende Dienste
-
-Die Dienste deklarieren nun zusätzlich `NSSendFileTypes` mit `public.item`
-(bzw. `public.folder` für das Verschiebeziel). Zuvor waren nur Zwischenablage-
-typen angegeben. Dies verbessert die Zuordnung zu ausgewählten Finder-Dateien;
-die konkrete Ursache auf dem betroffenen Mac ist noch nicht bestätigt.
-Der Installer registriert das Bundle erneut und fordert eine Aktualisierung
-beim Dienste-Agent an. Ein Menüpunkt erlaubt außerdem NSUpdateDynamicServices.
-
-Update: FinderExtras beenden, neuen Installer ausführen. Die alte App wird als
-ZIP unter ~/Library/Application Support/FinderExtras/Backups gesichert. Wegen
-der lokalen Ad-hoc-Signierung können Bedienungshilfen erneut erlaubt werden
-müssen. Falls Einträge fehlen, einmal ab-/anmelden und Finder → Dienste sowie
-die Dienste-Einstellungen prüfen. Kein Neustart oder globaler Cache-Reset wird
-erzwungen. Der macOS-Funktionstest dieser Korrektur steht weiterhin aus.
-
-## Änderung 0.1.2: Textclip statt Datei
-
-Die vier Dateiaktionen senden keine simulierten Cmd-C/Cmd-V-Tasten mehr.
-Ausschneiden/Kopieren übernehmen die Finder-Auswahl bzw. die vom Dienst
-übergebenen Datei-URLs direkt in die Zwischenablage. Verschieben/Einfügen
-akzeptieren ausschließlich Datei-URLs und rufen Finder move/duplicate direkt auf.
-Text wie ein kopierter Terminalbefehl wird zurückgewiesen. Kopieren anderer
-Inhalte ersetzt weiterhin die vorgemerkten Dateien.
-
-Abweichend von den Beschreibungen der früheren Versionen: Bestehende Namen im
-Ziel oder doppelte Quellnamen brechen den gesamten Auftrag vorab ab. Es wird
-nichts automatisch überschrieben oder zusammengeführt. Bei Laufzeitfehlern
-kann eine Teilübertragung stattgefunden haben; Quelle/Ziel prüfen. Eine Move-
-Zwischenablage wird dann verworfen, damit kein blinder Wiederholungsversuch
-stattfindet. Keine eigene Quelllöschung. Auf Netzwerkfreigaben können Operationen
-lange laufen; während des synchronen Finder-Auftrags ist das App-Menü blockiert.
-
-Für Dateiaktionen ist Finder-Automation nötig; Bedienungshilfen und System Events
-bleiben für die Ansichts-Kurzbefehle nötig. Noch kein macOS-Laufzeittest.
-Regressionstest: Terminaltext kopieren → App-Einfügen muss abbrechen; zwei
-Testdateien ausschneiden → Ziel → App-Verschieben; Quell-/Zielbestand prüfen.
+- https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/SysServices/Articles/properties.html
