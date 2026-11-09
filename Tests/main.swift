@@ -30,7 +30,7 @@ let conflict = try file("race.txt")
 let race = try engine.plan([conflict], into: to)
 try Data("original".utf8).write(to:to.appendingPathComponent("race.txt"))
 mustReject { try engine.execute(race,move:true) { _,_ in } }
-assert(engine.exists(conflict)); let unchanged = try String(contentsOf:to.appendingPathComponent("race.txt")); assert(unchanged == "original")
+assert(engine.exists(conflict)); let unchanged = try String(contentsOf:to.appendingPathComponent("race.txt"), encoding: .utf8); assert(unchanged == "original")
 if CommandLine.arguments.count > 1 {
     let other = URL(fileURLWithPath:CommandLine.arguments[1]).appendingPathComponent(UUID().uuidString)
     try fm.createDirectory(at:other,withIntermediateDirectories:true)
@@ -38,6 +38,15 @@ if CommandLine.arguments.count > 1 {
     let cross = try file("cross-volume.txt")
     try engine.execute(engine.plan([cross],into:other),move:true) { _,_ in }
     assert(!engine.exists(cross)); assert(engine.exists(other.appendingPathComponent(cross.lastPathComponent)))
-    print("Cross-volume move: source removed, target exists")
+    let folder = from.appendingPathComponent("nested ü")
+    try fm.createDirectory(at:folder.appendingPathComponent("child"),withIntermediateDirectories:true)
+    let nested = folder.appendingPathComponent("child/data.bin")
+    let bytes = Data((0..<4096).map { UInt8($0 % 256) })
+    try bytes.write(to:nested)
+    try engine.execute(engine.plan([folder],into:other),move:true) { _,_ in }
+    assert(!engine.exists(folder))
+    let copied = try Data(contentsOf:other.appendingPathComponent("nested ü/child/data.bin"))
+    assert(copied == bytes)
+    print("Cross-volume file and folder moves: sources removed, contents match")
 }
 print("Move, copy, conflicts, nesting, symlink and race tests passed")

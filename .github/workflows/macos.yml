@@ -14,6 +14,12 @@ jobs:
         run: TEST_CROSS_VOLUME=1 bash Tests/run.sh
       - name: Build native app and Finder extension
         run: bash Build.command "$RUNNER_TEMP/FinderExtras-build"
+      - name: Launch smoke test
+        run: |
+          open "$RUNNER_TEMP/FinderExtras-build/FinderExtras.app"
+          sleep 3
+          pgrep -x FinderExtras
+          pkill -x FinderExtras
       - name: Package app
         run: ditto -c -k --keepParent "$RUNNER_TEMP/FinderExtras-build/FinderExtras.app" "$RUNNER_TEMP/FinderExtras-0.2.0-macOS.zip"
       - uses: actions/upload-artifact@v4

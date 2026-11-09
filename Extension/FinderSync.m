@@ -24,7 +24,7 @@
     }
     NSNumber *directory = nil;
     [target getResourceValue:&directory forKey:NSURLIsDirectoryKey error:nil];
-    if (directory.boolValue) {
+    if (target && (kind == FIMenuKindContextualMenuForContainer || directory.boolValue || target.hasDirectoryPath)) {
         [self add:@"Hier einfügen · FinderExtras" action:@"paste" urls:@[] target:target menu:menu];
         [self add:@"Hierher verschieben" action:@"move" urls:@[] target:target menu:menu];
     }

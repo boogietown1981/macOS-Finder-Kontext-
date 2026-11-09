@@ -47,4 +47,4 @@ fi
 /usr/bin/pluginkit -a "$APP/Contents/PlugIns/FinderExtrasSync.appex"
 open "$APP"
 echo "Installiert: $APP"
-echo "Die Einrichtung steht unter FinderExtras → Hilfe und Einrichtung."
+echo "Die Einrichtung steht unter FinderExtras → Einrichtung & Status."

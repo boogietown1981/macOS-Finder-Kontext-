@@ -155,7 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let result = failure
             DispatchQueue.main.async {
                 self.busy = false
-                if move && board.changeCount == count { board.clearContents() }
+                if move && NSPasteboard.general.changeCount == count { NSPasteboard.general.clearContents() }
                 let summary = result ?? "\(plan.count) Objekt(e) \(move ? "verschoben; Quellen entfernt" : "kopiert; Quellen erhalten")."
                 self.progressLabel.stringValue = summary
                 self.status?.button?.toolTip = "FinderExtras — " + summary
@@ -209,7 +209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func permission(_ bundle: String, prompt: Bool = false) -> OSStatus {
-        let target = NSAppleEventDescriptor(descriptorType: typeApplicationBundleID, data: Data(bundle.utf8))
+        guard let target = NSAppleEventDescriptor(descriptorType: typeApplicationBundleID, data: Data(bundle.utf8)) else { return OSStatus(-50) }
         return AEDeterminePermissionToAutomateTarget(target.aeDesc, typeWildCard, typeWildCard, prompt)
     }
     func refreshPermissions() {
