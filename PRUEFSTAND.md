@@ -1,23 +1,5 @@
-# FinderExtras 0.2.0 – Prüfstand
+# FinderExtras 0.2.1
 
-Geprüfter Quellcode: 723a7303e30df4310fa54ab63aa39881367c4ca8.
-macOS 15 auf Apple Silicon; GitHub Actions erfolgreich:
-https://github.com/boogietown1981/macOS-Finder-Kontext-/actions/runs/42720587814
+Einrichtung erscheint automatisch nur, wenn noch kein setupVersion-Wert gespeichert ist. Bestehende Installationen behalten ihren Status. Dateiübertragungen öffnen das Einrichtungsfenster nicht mehr. Manuell bleibt es im Menü erreichbar. Fehlende Bedienungshilfen erzeugen weiterhin eine Fehlermeldung.
 
-Bestanden:
-- Native App und Finder-Sync-Erweiterung kompiliert.
-- Lokale Codesign-Prüfung von App und Erweiterung.
-- App gestartet und laufender Prozess bestätigt (Starttest, keine vollständige UI-Prüfung).
-- Verschieben und Kopieren auf demselben Volume.
-- Verschieben von Datei und verschachteltem Ordner auf separates Disk-Image:
-  Quelle entfernt, Zielinhalt stimmt überein.
-- Konflikte, verschachtelte Auswahl, symbolischer Link und nachträglich
-  belegter Zielname geprüft; kein Überschreiben.
-
-Noch manuell zu prüfen:
-- Finder-Kontextmenü nach Aktivierung der Erweiterung.
-- Interaktive Berechtigungsdialoge und Darstellung des Einrichtungsfensters.
-- Konkrete NAS-Freigaben, Cloud-Ordner, macOS 12–14 und Intel-Macs.
-
-Das ZIP enthält Quellcode und lokalen Build-Installer. Der Installer erzeugt
-auf deinem Mac die passende Architektur. Keine Apple-Notarisierung.
+Verschieben wurde vom Nutzer mit 0.2.0 bestätigt (Quelle entfernt, Ziel vorhanden). Die Kontextmenü-Übergabe ist weiterhin nicht als zuverlässig bestätigt. Diese Version ändert nur das Einrichtungsfenster-Verhalten. macOS-Buildprüfung siehe GitHub Actions zum Release-Commit; kein interaktiver macOS-Test in dieser Arbeitsumgebung.

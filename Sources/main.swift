@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         status?.menu = menu
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refreshPermissions() }
-        if UserDefaults.standard.string(forKey: "setupVersion") != "0.2" {
+        if UserDefaults.standard.string(forKey: "setupVersion") == nil {
             UserDefaults.standard.set("0.2", forKey: "setupVersion")
             DispatchQueue.main.async { self.showSetup() }
         }
@@ -70,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
     func key(_ command: String) throws {
-        guard AXIsProcessTrusted() else { showSetup(); throw TransferFailure(message: "Diese Ansichtsaktion benötigt Bedienungshilfen. Bitte im Einrichtungsfenster freigeben.") }
+        guard AXIsProcessTrusted() else { throw TransferFailure(message: "Diese Ansichtsaktion benötigt Bedienungshilfen. Bitte im Einrichtungsfenster freigeben.") }
         try script("""
         tell application "Finder" to activate
         tell application "System Events"
@@ -143,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: move ? "Verschieben" : "Kopieren"); alert.addButton(withTitle: "Abbrechen")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let count = board.changeCount
-        busy = true; showSetup()
+        busy = true
         progressLabel.stringValue = "Übertragung startet …"
         DispatchQueue.global(qos: .userInitiated).async {
             var failure: String?
@@ -253,7 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         func button(_ title: String, selector: Selector) {
             let button = NSButton(title: title, target: self, action: selector); button.bezelStyle = .rounded; stack.addArrangedSubview(button)
         }
-        text("FinderExtras 0.2.0", bold: true)
+        text("FinderExtras 0.2.1", bold: true)
         text("Ausschneiden → Einfügen verschiebt. Kopieren → Einfügen kopiert. Vor jeder Übertragung zeigt die App das Ziel und die Aktion. Gleichnamige Zieldateien werden nicht ersetzt.")
         stack.addArrangedSubview(extensionLabel)
         text("1 · Für die Einträge direkt im Finder-Rechtsklickmenü die FinderExtras-Erweiterung aktivieren. macOS bestimmt die Reihenfolge. Dienste bleiben als Alternative verfügbar.")
